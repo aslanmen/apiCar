@@ -544,109 +544,532 @@ class CarRentalViewSet(viewsets.ViewSet):
 
             return Response({"results": filtered_results}, status=status.HTTP_200_OK)
 
-    
-  
-from rest_framework.response import Response
-from rest_framework import status
-import requests
 
-class CarFilterViewSet(viewsets.ViewSet):
 
-    @action(detail=False, methods=['post'])
-    def search(self, request):
-        service = request.data.get("service")  
-        if service not in ["yolcu360", "enuygun"]:
-            return Response({"error": "Invalid service specified."}, status=status.HTTP_400_BAD_REQUEST)
-        
-        if service == "yolcu360":
-            place_id = request.data.get("place_id")
-            if not place_id:
-                return Response({"error": "place_id is required"}, status=status.HTTP_400_BAD_REQUEST)
+# class CarFilterViewSet(viewsets.ViewSet):
+
+#     @action(detail=False, methods=['post'])
+#     def search(self, request):
+#         service = request.data.get("service")  
+#         if service not in ["yolcu360", "enuygun"]:
+#             return Response({"error": "Invalid service specified."}, status=status.HTTP_400_BAD_REQUEST)
+
+#         if service == "yolcu360":
+#             place_id = request.data.get("place_id")
+#             if not place_id:
+#                 return Response({"error": "place_id is required"}, status=status.HTTP_400_BAD_REQUEST)
+
+#             location_url = f"https://maps.cms.yolcu360.com/api/maps/geocode?placeId={place_id}"
+#             location_response = requests.get(location_url)
+#             if location_response.status_code != 200:
+#                 return Response({"error": "Location not found"}, status=status.HTTP_404_NOT_FOUND)
             
-            location_url = f"https://maps.cms.yolcu360.com/api/maps/geocode?placeId={place_id}"
-            location_response = requests.get(location_url)
-            if location_response.status_code != 200:
-                return Response({"error": "Location not found"}, status=status.HTTP_404_NOT_FOUND)
+#             location_data = location_response.json()
+#             lat = location_data.get("lat")
+#             lng = location_data.get("lng")
+#             check_in_time = request.data.get("checkInDateTime")
+#             check_out_time = request.data.get("checkOutDateTime")
             
-            location_data = location_response.json()
-            lat = location_data.get("lat")
-            lng = location_data.get("lng")
-            check_in_time = request.data.get("checkInDateTime")
-            check_out_time = request.data.get("checkOutDateTime")
+#             payload = {
+#                 "checkInDateTime": check_in_time,
+#                 "checkOutDateTime": check_out_time,
+#                 "age": request.data.get("age"),
+#                 "checkInLocation": {"lat": lat, "lon": lng},
+#                 "checkOutLocation": {"lat": lat, "lon": lng},
+#                 "country": "TR",
+#                 "currency": "TRY",
+#                 "language": "tr",
+#                 "organizationId": 6836,
+#                 "paymentType": "creditCard",
+#                 "period": "daily"
+#             } 
             
-            payload = {
-                "checkInDateTime": check_in_time,
-                "checkOutDateTime": check_out_time,
-                "age": request.data.get("age"),
-                "checkInLocation": {
-                    "lat": lat,
-                    "lon": lng
-                },
-                "checkOutLocation": {
-                    "lat": lat,
-                    "lon": lng
-                },
-                "country": "TR",
-                "currency": "TRY",
-                "language": "tr",
-                "organizationId": 6836,
-                "paymentType": "creditCard",
-                "period": "daily"
-            } 
+#             url = "https://api2.yolcu360.com/api/v1/search-api/search/point/"
+#             response = requests.post(url, json=payload)
             
-            url = "https://api2.yolcu360.com/api/v1/search-api/search/point/"
-            response = requests.post(url, json=payload)
-            if response.status_code == 200:
-                data = response.json()
-                results = data.get('results') or []       
+#             if response.status_code == 200:
+#                 data = response.json()
+#                 results = data.get('results') or []       
+#                 available_brands = {}
+#                 available_models = {}
+#                 available_vendors = {}
+#                 available_fuels = {}
+#                 available_car_classes = {}
+#                 available_transmissions = {}
+
+#                 filter_brands = request.data.get("filters", {}).get("brands", [])
+#                 filter_models = request.data.get("filters", {}).get("models", [])
+#                 filter_vendors = request.data.get("filters", {}).get("vendors", [])
+#                 filter_fuels = request.data.get("filters", {}).get("fuels", [])
+#                 filter_car_classes = request.data.get("filters", {}).get("car_classes", [])
+#                 filter_transmissions = request.data.get("filters", {}).get("transmissions", [])
                 
-                available_brands = {}
-                available_models = {}
-                available_car_classes = {}
-                available_fuels = {}
-                available_transmissions = {}
-                available_vendors = {}
+#                 for car_data in results:
+#                     car_details = car_data.get('details', {}).get('car', {})
+                    
+#                     brand_name = car_details.get('brand', {}).get('name', '')
+#                     model_name = car_details.get('model', {}).get('name', '')
+#                     vendor_name = car_details.get('vendor', {}).get('displayName', '')
+#                     fuel_name = car_details.get('fuel', {}).get('name', '')
+#                     car_class_name = car_details.get('class', {}).get('name', '')
+#                     transmission_name = car_details.get('transmission', {}).get('name', '')
+
+                    
+#                     if filter_brands and brand_name not in filter_brands:
+#                         continue
+                    
+                
+#                     if filter_models and model_name not in filter_models:
+#                         continue
+                    
+#                     if filter_vendors and vendor_name not in filter_vendors:
+#                         continue
+                    
+                  
+#                     if filter_fuels and fuel_name not in filter_fuels:
+#                         continue
+                    
+                
+#                     if filter_car_classes and car_class_name not in filter_car_classes:
+#                         continue
+                 
+#                     if filter_transmissions and transmission_name not in filter_transmissions:
+#                         continue
+
+                  
+#                     if brand_name:
+#                         available_brands[brand_name] = available_brands.get(brand_name, 0) + 1
+                    
+                   
+#                     if model_name:
+#                         available_models[model_name] = available_models.get(model_name, 0) + 1
+
+                    
+#                     if vendor_name:
+#                         available_vendors[vendor_name] = available_vendors.get(vendor_name, 0) + 1
+                    
+                
+#                     if fuel_name:
+#                         available_fuels[fuel_name] = available_fuels.get(fuel_name, 0) + 1
 
                
-                filter_brands = request.data.get("filters", {}).get("brands", [])
-                filter_brands_set = set(filter_brands) if filter_brands else None
+#                     if car_class_name:
+#                         available_car_classes[car_class_name] = available_car_classes.get(car_class_name, 0) + 1
 
-                for car_data in results:
-                    car_details = car_data.get('details', {}).get('car', {})
-                    
-                    brand_name = car_details.get('brand', {}).get('name', '')
-                    if brand_name and (filter_brands_set is None or brand_name in filter_brands_set):
-                        available_brands[brand_name] = available_brands.get(brand_name, 0) + 1
+#                     if transmission_name:
+#                         available_transmissions[transmission_name] = available_transmissions.get(transmission_name, 0) + 1
 
-                        model_name = car_details.get('model', {}).get('name', '')
-                        if model_name:
-                            available_models[model_name] = available_models.get(model_name, 0) + 1
-
-                        car_class_name = car_details.get('class', {}).get('name', '')
-                        if car_class_name:
-                            available_car_classes[car_class_name] = available_car_classes.get(car_class_name, 0) + 1
-
-                        fuel_name = car_details.get('fuel', {}).get('name', '')
-                        if fuel_name:
-                            available_fuels[fuel_name] = available_fuels.get(fuel_name, 0) + 1
-
-                        transmission_name = car_details.get('transmission', {}).get('name', '')
-                        if transmission_name:
-                            available_transmissions[transmission_name] = available_transmissions.get(transmission_name, 0) + 1
-
-                        vendor_name = car_details.get('vendor', {}).get('displayName', '')
-                        if vendor_name:
-                            available_vendors[vendor_name] = available_vendors.get(vendor_name, 0) + 1
-
-                filters = {
-                    "brands": available_brands,
-                    "models": available_models,  
-                    "car_classes": available_car_classes,  
-                    "fuels": available_fuels,  
-                    "transmissions": available_transmissions,  
-                    "vendors": available_vendors,  
-                }
+#                 filters = {
+#                     "brands": available_brands,
+#                     "models": available_models,
+#                     "vendors": available_vendors,
+#                     "fuels": available_fuels,
+#                     "car_classes": available_car_classes,
+#                     "transmissions": available_transmissions,
+#                 }
                 
-                return Response({"filters": filters}, status=status.HTTP_200_OK)
-            else:
-                return Response({"error": response.text}, status=response.status_code)
+#                 return Response({"filters": filters}, status=status.HTTP_200_OK)
+#             else:
+#                 return Response({"error": response.text}, status=response.status_code)
+
+
+
+class CarFilterViewSet(viewsets.ViewSet):
+    @action(detail=False, methods=['post'])  
+    def search(self, request):
+     service = request.data.get("service")
+     if service not in ["yolcu360", "enuygun"]:
+        return Response({"error": "Invalid service specified."}, status=status.HTTP_400_BAD_REQUEST)
+
+     if service == "yolcu360":
+        place_id = request.data.get("place_id")
+        if not place_id:
+            return Response({"error": "place_id is required"}, status=status.HTTP_400_BAD_REQUEST)
+
+        location_url = f"https://maps.cms.yolcu360.com/api/maps/geocode?placeId={place_id}"
+        location_response = requests.get(location_url)
+        if location_response.status_code != 200:
+            return Response({"error": "Location not found"}, status=status.HTTP_404_NOT_FOUND)
+        
+        location_data = location_response.json()
+        lat = location_data.get("lat")
+        lng = location_data.get("lng")
+        check_in_time = request.data.get("checkInDateTime")
+        check_out_time = request.data.get("checkOutDateTime")
+        
+        payload = {
+            "checkInDateTime": check_in_time,
+            "checkOutDateTime": check_out_time,
+            "age": request.data.get("age"),
+            "checkInLocation": {"lat": lat, "lon": lng},
+            "checkOutLocation": {"lat": lat, "lon": lng},
+            "country": "TR",
+            "currency": "TRY",
+            "language": "tr",
+            "organizationId": 6836,
+            "paymentType": "creditCard",
+            "period": "daily"
+        } 
+        
+        url = "https://api2.yolcu360.com/api/v1/search-api/search/point/"
+        response = requests.post(url, json=payload)
+        
+        if response.status_code == 200:
+            data = response.json()
+            results = data.get('results') or []
+            print(len(results))
+            
+            formatted_results = []
+            available_brands = {}
+            available_models = {}
+            available_vendors = {}
+            available_fuels = {}
+            available_car_classes = {}
+            available_transmissions = {}
+
+            for car_data in results:
+                car_details = car_data.get('details', {}).get('car', {})
+                pricing = car_data.get('pricing', {}).get('display', {}).get('fee', {}).get('amount', {})
+                period = car_data.get('period', {})
+
+                formatted_car_data = {
+                    "Ofis": car_details.get('appointment', {}).get('checkInOffice', {}).get('address', {}).get('adm1', ''),
+                    "Başlangıç_tarihi": car_details.get('appointment', {}).get('checkInDateTime'),
+                    "Bitiş_Tarihi": car_details.get('appointment', {}).get('checkOutDateTime'),
+                    "Araç_Grubu": car_details.get('class', {}).get('name', ''),
+                    "Firma": car_details.get('vendor', {}).get('displayName', ''),
+                    "Broker": "Yolcu360",
+                    "Marka": car_details.get('brand', {}).get('name', ''),
+                    "Model": car_details.get('model', {}).get('name', ''),
+                    "Vites": car_details.get('transmission', {}).get('name', ''),
+                    "Yakıt": car_details.get('fuel', {}).get('name', ''),
+                    "Koltuk_Sayısı": car_details.get('seatCount', 0),
+                    "Fiyat": format_amount(pricing.get('amount', {})),
+                    "Gün": period.get('amount', 0),
+                }
+
+                formatted_results.append(formatted_car_data)
+
+                
+                if formatted_car_data["Marka"]:
+                    available_brands[formatted_car_data["Marka"]] = available_brands.get(formatted_car_data["Marka"], 0) + 1
+                if formatted_car_data["Model"]:
+                    available_models[formatted_car_data["Model"]] = available_models.get(formatted_car_data["Model"], 0) + 1
+                if formatted_car_data["Firma"]:
+                    available_vendors[formatted_car_data["Firma"]] = available_vendors.get(formatted_car_data["Firma"], 0) + 1
+                if formatted_car_data["Yakıt"]:
+                    available_fuels[formatted_car_data["Yakıt"]] = available_fuels.get(formatted_car_data["Yakıt"], 0) + 1
+                if formatted_car_data["Araç_Grubu"]:
+                    available_car_classes[formatted_car_data["Araç_Grubu"]] = available_car_classes.get(formatted_car_data["Araç_Grubu"], 0) + 1
+                if formatted_car_data["Vites"]:
+                    available_transmissions[formatted_car_data["Vites"]] = available_transmissions.get(formatted_car_data["Vites"], 0) + 1
+
+            filters = {
+                "brands": available_brands,
+                "models": available_models,
+                "vendors": available_vendors,
+                "fuels": available_fuels,
+                "car_classes": available_car_classes,
+                "transmissions": available_transmissions,
+            }
+
+            
+            request.session['car_filters'] = filters
+            request.session['car_results'] = results
+           
+            
+            return Response({"filters": filters, "results": formatted_results}, status=status.HTTP_200_OK)
+        else:
+            return Response({"error": response.text}, status=response.status_code)
+     elif service == "enuygun":
+        pick_up_date = request.data.get("pickUpDate")
+        drop_off_date = request.data.get("dropOffDate")
+        pick_up_location = request.data.get("pickUpLocation")
+        drop_off_location = request.data.get("dropOffLocation")
+        pick_up_time = request.data.get("pickUpTime")
+        drop_off_time = request.data.get("dropOffTime")
+        trip = request.data.get("trip", "domestic")
+        pagination = request.data.get("pagination", {"page": 1, "limit": 10})
+        page = pagination.get("page", 1)
+        limit = pagination.get("limit", 10)
+
+        if not all([pick_up_date, drop_off_date, pick_up_location, drop_off_location, pick_up_time, drop_off_time]):
+          return Response({"error": "All required fields must be provided."}, status=status.HTTP_400_BAD_REQUEST)
+
+        all_reservations = []
+
+        while True:
+         payload = {
+            "pickUpDate": pick_up_date,
+            "dropOffDate": drop_off_date,
+            "pickUpLocation": pick_up_location,
+            "dropOffLocation": drop_off_location,
+            "pickUpTime": pick_up_time,
+            "dropOffTime": drop_off_time,
+            "trip": trip,
+            "pagination": {
+                "page": page,
+                "limit": limit
+            }
+         }
+
+         url = "https://cr-search.enuygun.com/api/v1/search"
+         response = requests.post(url, json=payload)
+
+         if response.status_code == 200:
+            data = response.json()
+            reservations = data.get('data', {}).get('reservations', [])
+
+            if not reservations:
+                break
+
+            all_reservations.extend(reservations)
+            page += 1
+         else:
+            return Response({"error": response.text}, status=response.status_code)
+
+     if not all_reservations:
+        return Response({"error": "No cars found matching the criteria."}, status=status.HTTP_404_NOT_FOUND)
+
+     available_brands = {}
+     available_models = {}
+     available_vendors = {}
+     available_fuels = {}
+     available_car_classes = {}
+     available_transmissions = {}
+     formatted_results = []
+
+     for reservation in all_reservations:
+        vehicle = reservation.get("vehicle", {})
+        price = reservation.get("price", {})
+        location = reservation.get("location", {})
+
+        formatted_car_data = {
+            "Ofis": location.get('slug', ''),
+            "Başlangıç_tarihi": pick_up_date,
+            "Bitiş_Tarihi": drop_off_date,
+            "Araç_Grubu": vehicle.get('class', ''),
+            "Firma": reservation.get('company', {}).get('name', ''),
+            "Broker": "EnUygun",
+            "Marka": vehicle.get('brand', ''),
+            "Model": vehicle.get('name', ''),
+            "Vites": vehicle.get('transmission', ''),
+            "Yakıt": vehicle.get('fuel', ''),
+            "Fiyat": price.get('totalPrice', 0),
+            "Gün": reservation.get('days', 0),
+        }
+
+        formatted_results.append(formatted_car_data)
+
+        if formatted_car_data["Marka"]:
+            available_brands[formatted_car_data["Marka"]] = available_brands.get(formatted_car_data["Marka"], 0) + 1
+        if formatted_car_data["Model"]:
+            available_models[formatted_car_data["Model"]] = available_models.get(formatted_car_data["Model"], 0) + 1
+        if formatted_car_data["Firma"]:
+            available_vendors[formatted_car_data["Firma"]] = available_vendors.get(formatted_car_data["Firma"], 0) + 1
+        if formatted_car_data["Yakıt"]:
+            available_fuels[formatted_car_data["Yakıt"]] = available_fuels.get(formatted_car_data["Yakıt"], 0) + 1
+        if formatted_car_data["Araç_Grubu"]:
+            available_car_classes[formatted_car_data["Araç_Grubu"]] = available_car_classes.get(formatted_car_data["Araç_Grubu"], 0) + 1
+        if formatted_car_data["Vites"]:
+            available_transmissions[formatted_car_data["Vites"]] = available_transmissions.get(formatted_car_data["Vites"], 0) + 1
+
+     filters = {
+        "brands": available_brands,
+        "models": available_models,
+        "vendors": available_vendors,
+        "fuels": available_fuels,
+        "car_classes": available_car_classes,
+        "transmissions": available_transmissions,
+     }
+
+   
+     request.session['car_filters'] = filters
+     request.session['car_results'] = all_reservations
+     print(len(formatted_results))
+
+     return Response({"filters": filters, "results": formatted_results}, status=status.HTTP_200_OK)
+
+        
+          
+
+
+    @action(detail=False, methods=['get'], url_path='filter/results')
+    def get_filtered_results(self, request):
+        service = request.query_params.get('service')  
+        formatted_results = []
+        filters = {}
+
+        if service == 'yolcu360':
+           
+            car_results = request.session.get('car_results', [])
+            
+            if not car_results:
+                return Response({"error": "No car results found for Yolcu360."}, status=status.HTTP_404_NOT_FOUND)
+
+            
+            brand_filter = request.query_params.getlist('brands')
+            model_filter = request.query_params.getlist('models')
+            vendor_filter = request.query_params.getlist('vendors')
+            fuel_filter = request.query_params.getlist('fuels')
+            car_class_filter = request.query_params.getlist('car_classes')
+            transmission_filter = request.query_params.getlist('transmissions')
+            
+            available_brands = {}
+            available_models = {}
+            available_vendors = {}
+            available_fuels = {}
+            available_car_classes = {}
+            available_transmissions = {}
+
+            for car_data in car_results:
+                car_details = car_data.get('details', {}).get('car', {})
+                brand_name = car_details.get('brand', {}).get('name', '')
+                model_name = car_details.get('model', {}).get('name', '')
+                vendor_name = car_details.get('vendor', {}).get('displayName', '')
+                fuel_name = car_details.get('fuel', {}).get('name', '')
+                car_class_name = car_details.get('class', {}).get('name', '')
+                transmission_name = car_details.get('transmission', {}).get('name', '')
+                pricing = car_data.get('pricing', {}).get('display', {}).get('fee', {}).get('amount', {})
+                period = car_data.get('period', {})
+
+                formatted_car_data = {
+                    "Ofis": car_details.get('appointment', {}).get('checkInOffice', {}).get('address', {}).get('adm1', ''),
+                    "Başlangıç_tarihi": car_details.get('appointment', {}).get('checkInDateTime'),
+                    "Bitiş_Tarihi": car_details.get('appointment', {}).get('checkOutDateTime'),
+                    "Araç_Grubu": car_details.get('class', {}).get('name', ''),
+                    "Firma": car_details.get('vendor', {}).get('displayName', ''),
+                    "Broker": "Yolcu360",
+                    "Marka": car_details.get('brand', {}).get('name', ''),
+                    "Model": car_details.get('model', {}).get('name', ''),
+                    "Vites": car_details.get('transmission', {}).get('name', ''),
+                    "Yakıt": car_details.get('fuel', {}).get('name', ''),
+                    "Koltuk_Sayısı": car_details.get('seatCount', 0),
+                    "Fiyat": format_amount(pricing.get('amount', {})),
+                    "Gün": period.get('amount', 0),
+                }
+
+                
+                if brand_filter and brand_name not in brand_filter:
+                    continue
+                if model_filter and model_name not in model_filter:
+                    continue
+                if vendor_filter and vendor_name not in vendor_filter:
+                    continue
+                if fuel_filter and fuel_name not in fuel_filter:
+                    continue
+                if car_class_filter and car_class_name not in car_class_filter:
+                    continue
+                if transmission_filter and transmission_name not in transmission_filter:
+                    continue
+
+                formatted_results.append(formatted_car_data)
+
+                
+                if brand_name:
+                    available_brands[brand_name] = available_brands.get(brand_name, 0) + 1
+                if model_name:
+                    available_models[model_name] = available_models.get(model_name, 0) + 1
+                if vendor_name:
+                    available_vendors[vendor_name] = available_vendors.get(vendor_name, 0) + 1
+                if fuel_name:
+                    available_fuels[fuel_name] = available_fuels.get(fuel_name, 0) + 1
+                if car_class_name:
+                    available_car_classes[car_class_name] = available_car_classes.get(car_class_name, 0) + 1
+                if transmission_name:
+                    available_transmissions[transmission_name] = available_transmissions.get(transmission_name, 0) + 1
+
+            filters = {
+                "brands": available_brands,
+                "models": available_models,
+                "vendors": available_vendors,
+                "fuels": available_fuels,
+                "car_classes": available_car_classes,
+                "transmissions": available_transmissions,
+            }
+
+        elif service == 'enuygun':
+            car_results = request.session.get('car_results', [])
+            if not car_results:
+                return Response({"error": "No car results found for Yolcu360."}, status=status.HTTP_404_NOT_FOUND)
+
+            
+            brand_filter = request.query_params.getlist('brands')
+            model_filter = request.query_params.getlist('models')
+            vendor_filter = request.query_params.getlist('vendors')
+            fuel_filter = request.query_params.getlist('fuels')
+            car_class_filter = request.query_params.getlist('car_classes')
+            transmission_filter = request.query_params.getlist('transmissions')
+            
+            available_brands = {}
+            available_models = {}
+            available_vendors = {}
+            available_fuels = {}
+            available_car_classes = {}
+            available_transmissions = {}
+
+            for reservation in car_results:
+                vehicle = reservation.get("vehicle", {})
+                price = reservation.get("price", {})
+                location = reservation.get("location", {})
+
+                brand_name = vehicle.get('brand', '')
+                model_name = vehicle.get('name', '')
+                vendor_name = reservation.get('company', {}).get('name', '')
+                fuel_name = vehicle.get('fuel', '')
+                car_class_name = vehicle.get('class', '')
+                transmission_name = vehicle.get('transmission', '')
+                
+                formatted_car_data = {
+                    "Ofis": location.get('slug', ''),
+                    "Araç_Grubu": vehicle.get('class', ''),
+                    "Firma": reservation.get('company', {}).get('name', ''),
+                    "Broker": "EnUygun",
+                    "Marka": vehicle.get('brand', ''),
+                    "Model": vehicle.get('name', ''),
+                    "Vites": vehicle.get('transmission', ''),
+                    "Yakıt": vehicle.get('fuel', ''),
+                    "Fiyat": price.get('totalPrice', 0),
+                    "Gün": reservation.get('days', 0),
+                }
+
+                  
+                if brand_filter and brand_name not in brand_filter:
+                    continue
+                if model_filter and model_name not in model_filter:
+                    continue
+                if vendor_filter and vendor_name not in vendor_filter:
+                    continue
+                if fuel_filter and fuel_name not in fuel_filter:
+                    continue
+                if car_class_filter and car_class_name not in car_class_filter:
+                    continue
+                if transmission_filter and transmission_name not in transmission_filter:
+                    continue
+
+                formatted_results.append(formatted_car_data)
+
+                
+                if brand_name:
+                    available_brands[brand_name] = available_brands.get(brand_name, 0) + 1
+                if model_name:
+                    available_models[model_name] = available_models.get(model_name, 0) + 1
+                if vendor_name:
+                    available_vendors[vendor_name] = available_vendors.get(vendor_name, 0) + 1
+                if fuel_name:
+                    available_fuels[fuel_name] = available_fuels.get(fuel_name, 0) + 1
+                if car_class_name:
+                    available_car_classes[car_class_name] = available_car_classes.get(car_class_name, 0) + 1
+                if transmission_name:
+                    available_transmissions[transmission_name] = available_transmissions.get(transmission_name, 0) + 1
+
+            filters = {
+                "brands": available_brands,
+                "models": available_models,
+                "vendors": available_vendors,
+                "fuels": available_fuels,
+                "car_classes": available_car_classes,
+                "transmissions": available_transmissions,
+                }
+  
+        return Response({"filters": filters, "results": formatted_results}, status=status.HTTP_200_OK)
