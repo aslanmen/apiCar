@@ -4,13 +4,230 @@ from rest_framework import viewsets, status
 from rest_framework.response import Response
 from rest_framework.decorators import action
 from datetime import datetime
+from django.core.cache import cache
+import uuid
+from urllib.parse import urlencode
+from datetime import datetime
+from django.http import JsonResponse
+from rest_framework.views import APIView
+from selenium import webdriver
+from selenium.webdriver.common.by import By
+from selenium.webdriver.support.ui import WebDriverWait
+from selenium.webdriver.support import expected_conditions as EC
+from bs4 import BeautifulSoup as bs
+import time
 
 locale.setlocale(locale.LC_ALL, 'tr_TR.UTF-8')
 
 def format_amount(amount):
     return locale.format_string('%.2f', amount / 100, grouping=True)
 
-# class CarRentalViewSet(viewsets.ViewSet):
+class CarRentalAPIView(APIView):
+   def post(self, request):
+    service = request.data.get('service', 'obilet')
+    
+    pickup_location_name = request.data.get('pickup_location_name', "Kahramanmaraş Havalimanı")
+    pickup_location_id = request.data.get('pickup_location_id', 29)
+    dropoff_location_name = request.data.get('dropoff_location_name', "Kahramanmaraş Havalimanı")
+    dropoff_location_id = request.data.get('dropoff_location_id', 29)
+    pickup_date = request.data.get('pickup_date', "27.10.2024")
+    dropoff_date = request.data.get('dropoff_date', "28.11.2024")
+    pickup_time = request.data.get('pickup_time', "10:30")
+    dropoff_time = request.data.get('dropoff_time', "10:30")
+
+    base_url = "https://arac-kiralama.obilet.com/arac-ara?"
+    params = {
+        "PickupPointName": pickup_location_name,
+        "PickupPoint": pickup_location_id,
+        "DropPointName": dropoff_location_name,
+        "DropPoint": dropoff_location_id,
+        "PickupDate": pickup_date,
+        "PickupTime": pickup_time,
+        "DropDate": dropoff_date,
+        "DropTime": dropoff_time
+    }
+
+    url = f"{base_url}{urlencode(params)}"
+
+    pickup_date_dt = datetime.strptime(pickup_date, "%d.%m.%Y")
+    dropoff_date_dt = datetime.strptime(dropoff_date, "%d.%m.%Y")
+    days_count = (dropoff_date_dt - pickup_date_dt).days
+
+    options = webdriver.ChromeOptions()
+    options.add_argument('--headless')  
+    driver = webdriver.Chrome(options=options)
+    driver.get(url)
+
+    try:
+        WebDriverWait(driver, 30).until(
+            EC.presence_of_all_elements_located((By.CLASS_NAME, "vehicle"))
+        )
+    except Exception as e:
+        driver.quit()
+        return JsonResponse({"error": "Sayfa yüklenirken bir hata oluştu.", "details": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+    last_height = driver.execute_script("return document.body.scrollHeight")
+    while True:
+        driver.execute_script("window.scrollTo(0, document.body.scrollHeight);")
+        time.sleep(1)
+        new_height = driver.execute_script("return document.body.scrollHeight")
+        if new_height == last_height:
+            break
+        last_height = new_height
+
+    soup = bs(driver.page_source, 'html.parser')
+    pick_up_location = soup.find('li', class_='vehicle')['data-pickup-city']
+    car_cards = soup.find_all('li', class_='vehicle')
+    print(len(car_cards))
+    
+    available_brands = {}
+    available_models = {}
+    available_vendors = {}
+    available_fuels = {}
+    available_car_classes = {}
+    available_transmissions = {}
+    car_results = []
+    for card in car_cards:
+        car_name = card['data-model']
+        transmission = card['data-transmission-type']
+        fuel_type = card['data-fuel-type']
+        total_price = card['data-priced']
+        brand_name = card['data-vehicle-brand']
+        company = card['data-vendor']
+        car_group = card['data-category-type']
+
+        formatted_car_data={
+            'Ofis': pick_up_location,
+            'Başlangıç Tarihi': pickup_date,
+            'Bitiş Tarihi': dropoff_date,
+            'Araç_Grubu': car_group,
+            'Firma': company,
+            'Broker': service,
+            'Marka': brand_name,
+            'Model': car_name,
+            'Vites': transmission,
+            'Yakıt': fuel_type,
+            'Fiyat': total_price,
+            'Gün': days_count,
+        }
+        
+        car_results.append(formatted_car_data)
+        print(car_results)
+        if formatted_car_data["Marka"]:
+                available_brands[formatted_car_data["Marka"]] = available_brands.get(formatted_car_data["Marka"], 0) + 1
+        if formatted_car_data["Model"]:
+                available_models[formatted_car_data["Model"]] = available_models.get(formatted_car_data["Model"], 0) + 1
+        if formatted_car_data["Firma"]:
+                available_vendors[formatted_car_data["Firma"]] = available_vendors.get(formatted_car_data["Firma"], 0) + 1
+        if formatted_car_data["Yakıt"]:
+                available_fuels[formatted_car_data["Yakıt"]] = available_fuels.get(formatted_car_data["Yakıt"], 0) + 1
+        if formatted_car_data["Araç_Grubu"]:
+                available_car_classes[formatted_car_data["Araç_Grubu"]] = available_car_classes.get(formatted_car_data["Araç_Grubu"], 0) + 1
+        if formatted_car_data["Vites"]:
+                available_transmissions[formatted_car_data["Vites"]] = available_transmissions.get(formatted_car_data["Vites"], 0) + 1
+
+    filters = {
+                "brands": available_brands,
+                "models": available_models,
+                "vendors": available_vendors,
+                "fuels": available_fuels,
+                "car_classes": available_car_classes,
+                "transmissions": available_transmissions,
+            }
+   
+    session_id = uuid.uuid4().hex
+    cache.set(f'car_results_o{session_id}', car_results, timeout=3600)  
+
+    return Response({"filters": filters, "results": car_results, "session_id": session_id}, status=status.HTTP_200_OK)
+   def get(self, request):
+    service = request.query_params.get('service')  
+    formatted_results = []
+    session_id = request.query_params.get('session_id')
+
+    if not session_id:
+        return Response({"error": "session_id is required"}, status=status.HTTP_400_BAD_REQUEST)
+
+    car_results = cache.get(f'car_results_o{session_id}')
+
+    if not car_results:
+        return Response({"error": "Oturum süresi dolmuştur. Lütfen yeni bir arama yapın."}, status=status.HTTP_404_NOT_FOUND)
+
+    brand_filter = request.query_params.getlist('brands')
+    model_filter = request.query_params.getlist('models')
+    vendor_filter = request.query_params.getlist('vendors')
+    fuel_filter = request.query_params.getlist('fuels')
+    car_class_filter = request.query_params.getlist('car_classes')
+    transmission_filter = request.query_params.getlist('transmissions')
+
+    available_brands = {}
+    available_models = {}
+    available_vendors = {}
+    available_fuels = {}
+    available_car_classes = {}
+    available_transmissions = {}
+
+    for card in car_results:
+        car_class_name = card['Araç_Grubu']
+        vendor_name = card['Firma']
+        brand_name = card['Marka']
+        model_name = card['Model']
+        transmission_name = card['Vites']
+        fuel_name = card['Yakıt']
+        total_price = card['Fiyat']
+
+        formatted_car_data = {
+            'Araç_Grubu': car_class_name,
+            'Firma': vendor_name,
+            'Broker': service,
+            'Marka': brand_name,
+            'Model': model_name,
+            'Vites': transmission_name,
+            'Yakıt': fuel_name,
+            'Fiyat': total_price,
+        }
+
+       
+        if brand_filter and brand_name not in brand_filter:
+            continue
+        if model_filter and model_name not in model_filter:
+            continue
+        if vendor_filter and vendor_name not in vendor_filter:
+            continue
+        if fuel_filter and fuel_name not in fuel_filter:
+            continue
+        if car_class_filter and car_class_name not in car_class_filter:
+            continue
+        if transmission_filter and transmission_name not in transmission_filter:
+            continue
+
+        
+        formatted_results.append(formatted_car_data)
+
+     
+        available_brands[brand_name] = available_brands.get(brand_name, 0) + 1
+        available_models[model_name] = available_models.get(model_name, 0) + 1
+        available_vendors[vendor_name] = available_vendors.get(vendor_name, 0) + 1
+        available_fuels[fuel_name] = available_fuels.get(fuel_name, 0) + 1
+        available_car_classes[car_class_name] = available_car_classes.get(car_class_name, 0) + 1
+        available_transmissions[transmission_name] = available_transmissions.get(transmission_name, 0) + 1
+
+    filters = {
+        "brands": available_brands,
+        "models": available_models,
+        "vendors": available_vendors,
+        "fuels": available_fuels,
+        "car_classes": available_car_classes,
+        "transmissions": available_transmissions,
+    }
+
+    return Response({"filters": filters, "results": formatted_results}, status=status.HTTP_200_OK)
+
+
+
+
+    
+    
+    # class CarRentalViewSet(viewsets.ViewSet):
 
 #     @action(detail=False, methods=['post'])
 #     def search(self, request):
@@ -258,6 +475,48 @@ class AutoComplete(viewsets.ViewSet):
         except requests.exceptions.RequestException as e:
             return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
+class AutocompleteViewSet(viewsets.ViewSet):
+
+    @action(detail=False, methods=['get'])
+    def autocomplete(self, request):
+        input_text = request.query_params.get("input")
+        if not input_text:
+            return Response({"error": "Input verisi gereklidir."}, status=status.HTTP_400_BAD_REQUEST)
+
+        url = f"https://cr-core.enuygun.com/api/v1/autocomplete/{input_text}"
+
+        try:
+            response = requests.get(url)
+
+          
+            if response.history:
+                for resp in response.history:
+                    print(f"Redirected from: {resp.url} with status code: {resp.status_code}")
+                print(f"Final destination: {response.url}")
+
+                response = requests.get(response.url)
+
+            if response.status_code == 200:
+                data = response.json().get('data', [])  
+                formatted_suggestions = [
+                    {
+                        "name": suggestion.get("name"),
+                        "slug": suggestion.get("slug"),
+                        "isAirport": suggestion.get("isAirport"),
+                        "type": suggestion.get("type"),
+                        "country": suggestion.get("country"),
+                        "countryCode": suggestion.get("countryCode"),
+                        "fullName": f"{suggestion.get('name')}, {suggestion.get('country')}",
+                        "iconUrl": suggestion.get("iconUrl"),
+                        "trip": suggestion.get("trip")
+                    } for suggestion in data
+                ]
+                return Response({"suggestions": formatted_suggestions}, status=status.HTTP_200_OK)
+            else:
+                return Response({"error": "Otomatik tamamlama bilgisi alınamadı."}, status=status.HTTP_400_BAD_REQUEST)
+
+        except requests.exceptions.RequestException as e:
+            return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 class CarRentalEnViewSet(viewsets.ViewSet):
 
@@ -717,7 +976,9 @@ class CarFilterViewSet(viewsets.ViewSet):
         if response.status_code == 200:
             data = response.json()
             results = data.get('results') or []
-            print(len(results))
+            if not results:
+               return Response({"message": "Araç bulunmamaktadır."}, status=status.HTTP_404_NOT_FOUND)
+            
             
             formatted_results = []
             available_brands = {}
@@ -774,11 +1035,12 @@ class CarFilterViewSet(viewsets.ViewSet):
             }
 
             
-            request.session['car_filters'] = filters
-            request.session['car_results'] = results
+            session_id = uuid.uuid4().hex
+            cache.set(f'car_results_{session_id}', results, timeout=3600) 
+           
            
             
-            return Response({"filters": filters, "results": formatted_results}, status=status.HTTP_200_OK)
+            return Response({"filters": filters, "results": formatted_results,"session_id": session_id}, status=status.HTTP_200_OK)
         else:
             return Response({"error": response.text}, status=response.status_code)
      elif service == "enuygun":
@@ -792,6 +1054,8 @@ class CarFilterViewSet(viewsets.ViewSet):
         pagination = request.data.get("pagination", {"page": 1, "limit": 10})
         page = pagination.get("page", 1)
         limit = pagination.get("limit", 10)
+
+        print(drop_off_location)
 
         if not all([pick_up_date, drop_off_date, pick_up_location, drop_off_location, pick_up_time, drop_off_time]):
           return Response({"error": "All required fields must be provided."}, status=status.HTTP_400_BAD_REQUEST)
@@ -819,6 +1083,9 @@ class CarFilterViewSet(viewsets.ViewSet):
          if response.status_code == 200:
             data = response.json()
             reservations = data.get('data', {}).get('reservations', [])
+            date= data.get('data', {}).get('searchParameters', {})
+            pick_up_date1 = date.get('pickUpDate',None)
+            drop_off_date1 = date.get('dropOffDate', None)
 
             if not reservations:
                 break
@@ -828,8 +1095,8 @@ class CarFilterViewSet(viewsets.ViewSet):
          else:
             return Response({"error": response.text}, status=response.status_code)
 
-     if not all_reservations:
-        return Response({"error": "No cars found matching the criteria."}, status=status.HTTP_404_NOT_FOUND)
+        if not all_reservations:
+         return Response({"error": "No cars found matching the criteria."}, status=status.HTTP_404_NOT_FOUND)
 
      available_brands = {}
      available_models = {}
@@ -846,8 +1113,8 @@ class CarFilterViewSet(viewsets.ViewSet):
 
         formatted_car_data = {
             "Ofis": location.get('slug', ''),
-            "Başlangıç_tarihi": pick_up_date,
-            "Bitiş_Tarihi": drop_off_date,
+            "Başlangıç_tarihi": pick_up_date1,
+            "Bitiş_Tarihi": drop_off_date1,
             "Araç_Grubu": vehicle.get('class', ''),
             "Firma": reservation.get('company', {}).get('name', ''),
             "Broker": "EnUygun",
@@ -883,12 +1150,14 @@ class CarFilterViewSet(viewsets.ViewSet):
         "transmissions": available_transmissions,
      }
 
-   
-     request.session['car_filters'] = filters
-     request.session['car_results'] = all_reservations
+     session_id = uuid.uuid4().hex
+     cache.set(f'car_results_en{session_id}', all_reservations, timeout=3600)
+     print(all_reservations)
+     request.session['pickDate']=pick_up_date1
+     request.session['dropDate']=drop_off_date1
      print(len(formatted_results))
 
-     return Response({"filters": filters, "results": formatted_results}, status=status.HTTP_200_OK)
+     return Response({"filters": filters, "results": formatted_results,"session_id":session_id}, status=status.HTTP_200_OK)
 
         
           
@@ -899,14 +1168,17 @@ class CarFilterViewSet(viewsets.ViewSet):
         service = request.query_params.get('service')  
         formatted_results = []
         filters = {}
+        session_id = request.query_params.get('session_id')
+        if not session_id:
+            return Response({"error": "session_id is required"}, status=status.HTTP_400_BAD_REQUEST)
 
         if service == 'yolcu360':
            
-            car_results = request.session.get('car_results', [])
+            car_results = cache.get(f'car_results_{session_id}')
             
             if not car_results:
-                return Response({"error": "No car results found for Yolcu360."}, status=status.HTTP_404_NOT_FOUND)
-
+                return Response({"error": "Oturum süresi dolmuştur. Lütfen yeni bir arama yapın."}, status=status.HTTP_404_NOT_FOUND)
+        
             
             brand_filter = request.query_params.getlist('brands')
             model_filter = request.query_params.getlist('models')
@@ -989,10 +1261,13 @@ class CarFilterViewSet(viewsets.ViewSet):
             }
 
         elif service == 'enuygun':
-            car_results = request.session.get('car_results', [])
+            car_results = cache.get(f'car_results_en{session_id}')
+            pickDate = request.session.get('pickDate', [])
+            dropDate = request.session.get('dropDate', [])
+            
             if not car_results:
-                return Response({"error": "No car results found for Yolcu360."}, status=status.HTTP_404_NOT_FOUND)
-
+                return Response({"error": "Oturum süresi dolmuştur. Lütfen yeni bir arama yapın."}, status=status.HTTP_404_NOT_FOUND)
+ 
             
             brand_filter = request.query_params.getlist('brands')
             model_filter = request.query_params.getlist('models')
@@ -1022,6 +1297,8 @@ class CarFilterViewSet(viewsets.ViewSet):
                 
                 formatted_car_data = {
                     "Ofis": location.get('slug', ''),
+                    "Başlangıç_tarihi": pickDate,
+                    "Bitiş_Tarihi": dropDate,
                     "Araç_Grubu": vehicle.get('class', ''),
                     "Firma": reservation.get('company', {}).get('name', ''),
                     "Broker": "EnUygun",
