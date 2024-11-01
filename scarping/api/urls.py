@@ -1,5 +1,5 @@
 from django.urls import path
-from scarping.api.views import CarRentalViewSet, AutoComplete, CarRentalEnViewSet,CarFilterViewSet,AutocompleteViewSet,CarRentalAPIView
+from scarping.api.views import CarRentalViewSet, AutoComplete, CarRentalEnViewSet,CarFilterViewSet,AutocompleteViewSet,CarRentalAPIView,AutoCompleteObilet
 
 urlpatterns = [
 #     path('api/', CarRentalViewSet.as_view({'post': 'search'}), name='car-rental-search'),
@@ -8,6 +8,7 @@ urlpatterns = [
     path('filter/',CarFilterViewSet.as_view({'post':'search'}),name='car-rental-filter'),
     path('autocomplete/', AutoComplete.as_view({'get': 'autocomplete'}), name='autocomplete'),
     path('auto/', AutocompleteViewSet.as_view({'get': 'autocomplete'}), name='autocomplete'),
+    path('autobilet/',AutoCompleteObilet.as_view({'get':'autocomplete'}),name="autocomplete"),
     path('api/car/', CarRentalAPIView.as_view(), name='car-data'),
     path('filter/results/', CarFilterViewSet.as_view({'get': 'get_filtered_results'}), name='car-rental-filter-results'),
 ]

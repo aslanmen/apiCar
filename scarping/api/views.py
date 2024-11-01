@@ -489,6 +489,42 @@ class AutoComplete(viewsets.ViewSet):
 
         except requests.exceptions.RequestException as e:
             return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        
+class AutoCompleteObilet(viewsets.ViewSet):
+    @action(detail=False,methods=['get'])
+    def autocomplete(self,request):
+        input_text=request.query_params.get('input')
+        if not input_text:
+            return Response({"error": "Input verisi gereklidir."}, status=status.HTTP_400_BAD_REQUEST)
+        
+        url=f"https://arac-kiralama.obilet.com/GetLocations/tr?searchText={input_text}&isPickup=true"
+
+        try:
+            response = requests.get(url)
+            
+            
+            if response.history:
+                for resp in response.history:
+                    print(f"Redirected from: {resp.url} with status code: {resp.status_code}")
+                print(f"Final destination: {response.url}")
+                
+                response = requests.get(response.url)
+            
+            if response.status_code == 200:
+                suggestions = response.json()
+                formatted_suggestions = [
+                    {
+                        "cityName": suggestion.get("cityName"),
+                        "locationId": suggestion.get("locationId"),
+                        "locationName": suggestion.get("locationName")
+                    } for suggestion in suggestions
+                ]
+                return Response({"suggestions": formatted_suggestions}, status=status.HTTP_200_OK)
+            else:
+                return Response({"error": "Otomatik tamamlama bilgisi alınamadı."}, status=status.HTTP_400_BAD_REQUEST)
+
+        except requests.exceptions.RequestException as e:
+            return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 class AutocompleteViewSet(viewsets.ViewSet):
 
@@ -956,6 +992,7 @@ class CarFilterViewSet(viewsets.ViewSet):
         return Response({"error": "Invalid service specified."}, status=status.HTTP_400_BAD_REQUEST)
 
      if service == "yolcu360":
+        print(request.data)
         place_id = request.data.get("place_id")
         if not place_id:
             return Response({"error": "place_id is required"}, status=status.HTTP_400_BAD_REQUEST)
@@ -1055,25 +1092,26 @@ class CarFilterViewSet(viewsets.ViewSet):
            
            
             
-            return Response({"filters": filters, "results": formatted_results,"session_id": session_id}, status=status.HTTP_200_OK)
+            return Response({"session_id": session_id,"filters": filters, "results": formatted_results}, status=status.HTTP_200_OK)
         else:
             return Response({"error": response.text}, status=response.status_code)
      elif service =="obilet":
-       
-        pickup_location_name = request.data.get('pickup_location_name', "Kahramanmaraş Havalimanı")
-        pickup_location_id = request.data.get('pickup_location_id', 29)
-        dropoff_location_name = request.data.get('dropoff_location_name', "Kahramanmaraş Havalimanı")
-        dropoff_location_id = request.data.get('dropoff_location_id', 29)
-        pickup_date = request.data.get('pickup_date', "31.10.2024")
-        dropoff_date = request.data.get('dropoff_date', "02.11.2024")
-        pickup_time = request.data.get('pickup_time', "10:30")
-        dropoff_time = request.data.get('dropoff_time', "10:30")
+        print(request.data)
 
+        
+        pickup_location_id = request.data.get("pickup_location_id")
+        dropoff_location_id = request.data.get("dropoff_location_id")
+        pickup_date1 = request.data.get("pickup_date")
+        dropoff_date1 = request.data.get("dropoff_date")
+        pickup_time = request.data.get("pickup_time")
+        dropoff_time = request.data.get("dropoff_time")
+        date_object = datetime.strptime(pickup_date1, "%Y-%m-%d")
+        pickup_date = date_object.strftime("%d.%m.%Y")
+        date_object1 = datetime.strptime(dropoff_date1, "%Y-%m-%d")
+        dropoff_date = date_object1.strftime("%d.%m.%Y")
         base_url = "https://arac-kiralama.obilet.com/arac-ara?"
         params = {
-            "PickupPointName": pickup_location_name,
             "PickupPoint": pickup_location_id,
-            "DropPointName": dropoff_location_name,
             "DropPoint": dropoff_location_id,
             "PickupDate": pickup_date,
             "PickupTime": pickup_time,
@@ -1151,7 +1189,6 @@ class CarFilterViewSet(viewsets.ViewSet):
             }
             
             car_results.append(formatted_car_data)
-            print(car_results)
             if formatted_car_data["Marka"]:
                     available_brands[formatted_car_data["Marka"]] = available_brands.get(formatted_car_data["Marka"], 0) + 1
             if formatted_car_data["Model"]:
@@ -1359,7 +1396,7 @@ class CarFilterViewSet(viewsets.ViewSet):
                     "Gün": period.get('amount', 0),
                 }
 
-                
+
                 if brand_filter and brand_name not in brand_filter:
                     continue
                 if model_filter and model_name not in model_filter:
@@ -1371,12 +1408,10 @@ class CarFilterViewSet(viewsets.ViewSet):
                 if car_class_filter and car_class_name not in car_class_filter:
                     continue
                 if transmission_filter and transmission_name not in transmission_filter:
-                    continue
-
-                formatted_results.append(formatted_car_data)
-              
-
+                    continue      
                 
+                formatted_results.append(formatted_car_data)
+
                 if brand_name:
                     available_brands[brand_name] = available_brands.get(brand_name, 0) + 1
                 if model_name:
@@ -1389,6 +1424,33 @@ class CarFilterViewSet(viewsets.ViewSet):
                     available_car_classes[car_class_name] = available_car_classes.get(car_class_name, 0) + 1
                 if transmission_name:
                     available_transmissions[transmission_name] = available_transmissions.get(transmission_name, 0) + 1
+                    
+                # if brand_name:
+                #  available_brands[brand_name] = available_brands.get(brand_name, 0) + 1
+
+                # if brand_name in brand_filter:
+                #     available_models[model_name] = available_models.get(model_name, 0) + 1
+
+                    
+                #     if (not model_filter or model_name in model_filter) and \
+                #     (not vendor_filter or vendor_name in vendor_filter) and \
+                #     (not fuel_filter or fuel_name in fuel_filter) and \
+                #     (not car_class_filter or car_class_name in car_class_filter) and \
+                #     (not transmission_filter or transmission_name in transmission_filter):
+
+                #         if brand_name in brand_filter:
+                #             available_models[model_name] = available_models.get(model_name, 0) + 1
+                #         if vendor_name:
+                #             available_vendors[vendor_name] = available_vendors.get(vendor_name, 0) + 1
+                #         if fuel_name:
+                #             available_fuels[fuel_name] = available_fuels.get(fuel_name, 0) + 1
+                #         if car_class_name:
+                #             available_car_classes[car_class_name] = available_car_classes.get(car_class_name, 0) + 1
+                #         if transmission_name:
+                #             available_transmissions[transmission_name] = available_transmissions.get(transmission_name, 0) + 1
+
+
+             
             if not formatted_results:
                   return Response({"error": "Aradığınız kriterlere ait araç bulunamadı."}, status=status.HTTP_404_NOT_FOUND)
             filters = {
